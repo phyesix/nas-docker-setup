@@ -1,0 +1,69 @@
+version: "3.6"
+
+services:
+  wireguard:
+    container_name: wireguard
+    image: linuxserver/wireguard:latest
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv4.conf.all.src_valid_mark=1
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=Europe/Istanbul
+    ports:
+      - "9091:9091/tcp"
+    volumes:
+      - ./wireguard:/config
+      - /lib/modules:/lib/modules
+    restart: always
+    networks:
+      cnetwork:
+        ipv4_address: 10.0.4.10
+
+  transmission:
+    container_name: transmission
+    image: linuxserver/transmission:latest
+    depends_on:
+      - wireguard
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=Europe/Istanbul
+      - USER=phyesix
+      - PASS=phyesix
+      - PEERPORT=54914
+    volumes:
+      - ./transmission/transmission-config:/config
+      - /media/nas/torrent/downloads:/downloads
+      - /media/nas/torrent/watch:/watch
+    restart: always
+    network_mode: "service:wireguard"
+
+  portainer:
+    container_name: portainer
+    image: portainer/portainer-ce:latest
+    ports:
+      - 9443:9443
+    volumes:
+      - ./portainer/data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    networks:
+      cnetwork:
+        ipv4_address: 10.0.4.11
+
+networks:
+  cnetwork:
+    name: cnetwork
+    driver: macvlan
+    driver_opts:
+      parent: eth0
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.4.0/16
+          gateway: 10.0.0.2
